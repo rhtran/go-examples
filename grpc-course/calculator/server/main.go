@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/rhtran/go-examples/grpc-course/calculator/calculatorpb"
 	"google.golang.org/grpc"
+	"io"
 	"log"
 	"net"
 )
@@ -39,6 +40,58 @@ func (*server) PrimeNumberDecomposition(request *calculatorpb.PrimeNumberDecompo
 		} else {
 			divisor++
 			fmt.Printf("Divisor has increased to %v\n", divisor)
+		}
+	}
+
+	return nil
+}
+
+func (*server) ComputeAverage(stream calculatorpb.CalculatorService_ComputeAverageServer) error {
+	fmt.Printf("ComputeAverage function was invoked with a streaming request\n")
+	sum := int32(0)
+	count := 0
+
+	for {
+		request, err := stream.Recv()
+		if err == io.EOF {
+			average := float64(sum) / float64(count)
+			return stream.SendAndClose(&calculatorpb.ComputeAverageResponse{
+				Average: average,
+			})
+		}
+		if err != nil {
+			log.Fatalf("Error while reading client stream: %v", err)
+		}
+		sum += request.Number
+		count++
+	}
+
+	return nil
+}
+
+func (*server) FindMaximum(stream calculatorpb.CalculatorService_FindMaximumServer) error {
+	fmt.Printf("FindMaximum function was invoked with a streaming request\n")
+	max := int32(0)
+
+	for {
+		request, err := stream.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			log.Fatalf("Error while reading client stream: %v", err)
+			return err
+		}
+
+		if request.Number > max {
+			max = request.Number
+			sendErr := stream.Send(&calculatorpb.FindMaximumResponse{
+				Max: max,
+			})
+			if sendErr != nil {
+				log.Fatalf("Error while sending data to client: %v", err)
+				return err
+			}
 		}
 	}
 
